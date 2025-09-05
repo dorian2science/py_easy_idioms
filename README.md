@@ -34,6 +34,7 @@ The goal of this project is exactly to enable to generate those kind of videos b
 - [ ] full routine using last_words after check_words
 - [ ] try to embed in a full software
 
+
 # installation
 ## Create a new environment called 'myenv'
 python -m venv myenv
@@ -49,3 +50,6 @@ pip install -r requirements.txt
 
 pip install ipykernel
 python -m ipykernel install --user --name=myenv --display-name "arabic"
+
+## build .env of the project
+should contain field <DATA_FOLDER> with the path of where all data will be stored.
