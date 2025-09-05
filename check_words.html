@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Table</title>
+    <style>
+        table {
+            width: 50%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+            cursor: pointer;
+        }
+        button {
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+
+<h3>ctrl-click on a cell to decrement</h3>
+<h3>alt-click on a cell to increment</h3>
+
+<!-- File input to load CSV -->
+<input type="file" id="csvFileInput" accept=".csv">
+
+<button onclick="shuffleRows()">rearranger</button>
+
+<button onclick="downloadCSV()">Download CSV</button>
+
+<table id="dataTable">
+    <thead>
+        <tr>
+            <th data-column="0">index</th>
+            <th data-column="1">group</th>
+            <th data-column="2">fr</th>
+            <th data-column="3">ar</th>
+            <th data-column="4">iteration</th>
+        </tr>
+    </thead>
+    <tbody id="tableBody">
+        <!-- Rows will be populated by JavaScript -->
+    </tbody>
+</table>
+
+<h3>Removed Row Indices</h3>
+<ul id="removedIndices"></ul>
+
+<script>
+    let data = [];
+
+    // Listen for file input change to read the CSV
+    document.getElementById('csvFileInput').addEventListener('change', handleFileSelect, false);
+
+// Parse the selected CSV file
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file && file.type === 'text/csv') {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const csv = e.target.result;
+            parseCSV(csv);
+        };
+        reader.readAsText(file);
+    } else {
+        alert('Please select a valid CSV file.');
+    }
+    // shuffleRows()
+}
+
+// Parse CSV data and populate the table
+let lines
+function parseCSV(csv) {
+    lines = csv.split('\n');
+    data = lines.slice(1).map((line, index) => {
+        const values = line.split(',');
+        return {
+            index: index,
+            group: values[0],
+            fr: values[1],
+            ar: values[2],
+            iteration: values[3]
+        };
+    });
+    populateTable(data);
+    // shuffleRows()
+}
+
+function populateTable(data) {
+  const tableBody = document.getElementById('tableBody');
+  tableBody.innerHTML = ''; // Clear the table before adding rows
+
+  data.slice(0,data.length-1).forEach((row, index) => {
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-index', row.index);
+      tr.innerHTML = `
+        <td>${row.index}</td>
+        <td>${row.group}</td>
+        <td>${row.fr}</td>
+        <td>${row.ar}</td>
+        <td class="iterations-cell">${row.iteration}</td>`
+        ;
+
+      // Listen for Ctrl + Left Click to remove row
+      tr.addEventListener('mousedown', function(event) {
+          if (event.ctrlKey) {
+            increment_row(tr,-1)
+          }
+      });
+
+      // Alt+Click to increment iterations
+      tr.addEventListener('click', function(event) {
+          if (event.altKey) {
+            increment_row(tr,1)
+          }
+      });
+      tableBody.appendChild(tr);
+  });
+}
+
+function increment_row(tr,inc){
+  const rowIndex = parseInt(tr.getAttribute('data-index'));
+  const currentData = data.find(d => d.index == rowIndex);
+  currentData.iteration = parseInt(currentData.iteration)+inc;
+  tr.querySelector('.iterations-cell').innerText = currentData.iteration;
+  const tableBody = document.getElementById('tableBody');
+  tableBody.appendChild(tr);
+}
+
+// Function to shuffle rows
+function shuffleRows() {
+    const rowsArray = Array.from(document.getElementById('tableBody').rows);
+    const shuffledRows = shuffleArray(rowsArray);
+    const tableBody = document.getElementById('tableBody');
+    tableBody.innerHTML = ''; // Clear the table body
+    shuffledRows.forEach(row => {
+      row.style.backgroundColor =''
+      tableBody.appendChild(row)
+    });
+    tableBody.children[0].style.backgroundColor ='cyan'
+}
+
+// Helper function to shuffle an array
+function shuffleArray(array) {
+  let shuffledArray = array.slice();
+  for (let i = shuffledArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledArray[i], shuffledArray[j]] = [shuffledArray[j], shuffledArray[i]]; // Swap elements
+  }
+  return shuffledArray;
+}
+
+// Function to toggle column visibility
+const columnVisibility = [true, true, true, true,true]; // Track visibility of each column (index, fr, ar, group)
+
+document.querySelectorAll('th').forEach(header => {
+    header.addEventListener('click', function() {
+        const columnIndex = header.getAttribute('data-column');
+        columnVisibility[columnIndex] = !columnVisibility[columnIndex]; // Toggle visibility
+        toggleColumnVisibility(columnIndex);
+    });
+});
+
+// Function to hide/show columns
+function toggleColumnVisibility(columnIndex) {
+    const rows = document.querySelectorAll('#tableBody tr');
+    rows.forEach(row => {
+        const cell = row.children[columnIndex];
+        if (columnVisibility[columnIndex]) {
+            cell.style.display = ''; // Show cell
+        } else {
+            cell.style.display = 'none'; // Hide cell
+        }
+    });
+}
+
+function generate_csv(){
+  const rows = Array.from(document.querySelectorAll('#dataTable tbody tr'));
+  rows.sort((a, b) => {
+        const aText = a.children[2].innerText.toLowerCase();
+        const bText = b.children[2].innerText.toLowerCase();
+        return aText.localeCompare(bText);
+    });
+  const csv = [];
+
+  // Add header row
+  csv.push(['group', 'fr', 'ar', 'iteration'].join(','));
+
+  // Add table body rows
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td');
+    const rowData = Array.from(cells).slice(1,).map(cell => {
+      // Escape quotes and commas in cell values
+      let text = cell.innerText;
+      if (text.includes(',') || text.includes('"')) {
+        text = `"${text.replace(/"/g, '""')}"`;
+      }
+      return text;
+    });
+    csv.push(rowData.join(','));
+  });
+  return csv
+}
+
+function downloadCSV() {
+  csv = generate_csv()
+  // Create and trigger a download link
+  const csvContent = csv.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'last_words.csv';
+  link.click();
+}
+
+</script>
+
+</body>
+</html>

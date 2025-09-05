@@ -1,0 +1,8 @@
+myenv/
+.env
+DATA_FOLDER/
+notebooks/
+tts_samples/
+py_easy_idiom/__pycache__/
+.ipynb_checkpoints/
+test_venv/
