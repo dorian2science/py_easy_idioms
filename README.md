@@ -27,8 +27,8 @@ The goal of this project is exactly to enable to generate those kind of videos b
 - [x] do not regenerate them if already available
 - [x] generate video.
 - [ ] adjust check words to sort out ar/en/iteration words from video.
-  - [ ] add feature to modify field by pressing enter and be able to modify text of cell
-  - [ ] add edge tts by double clicking on ar cell 
+  - [x] add feature to modify field by pressing enter and be able to modify text of cell
+  - [ ] add edge tts by double clicking on ar cell
 - [ ] make routine to generate new_words and new_videos_based on dataframe with iterations.
     - [ ] from new fresh words iteration>1
     - [ ] from known words
