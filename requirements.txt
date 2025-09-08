@@ -8,3 +8,8 @@ googletrans==4.0.0-rc1
 pydub>=0.25.1
 python-dotenv>=1.0.0
 tqdm>=4.65
+argostranslate
+youtube_transcript_api
+pyperclip
+arabicstemmer
+nltk

@@ -38,6 +38,7 @@
 
 <h3>ctrl-click on a cell to decrement</h3>
 <h3>alt-click on a cell to increment</h3>
+<h3>shift-click on a cell to -10 to delete it</h3>
 
 <!-- File input to load CSV -->
 <input type="file" id="csvFileInput" accept=".csv">
@@ -130,6 +131,11 @@ function populateTable(data) {
       tr.addEventListener('click', function(event) {
           if (event.altKey) {
             increment_row(tr,1)
+          }
+      });
+      tr.addEventListener('click', function(event) {
+          if (event.shiftKey) {
+            increment_row(tr,-10)
           }
       });
       tableBody.appendChild(tr);

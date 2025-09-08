@@ -36,8 +36,6 @@ SLEEP_MAX = 1.5            # seconds (politeness)
 
 HEADERS = {"User-Agent": USER_AGENT}
 
-WORD_RE = re.compile(r"\b[a-z']+\b", re.IGNORECASE)  # basic tokenizer: letters and apostrophes
-
 def get_random_page_title(session):
     """
     Use action=query&list=random to get a random page title in main namespace.
@@ -79,6 +77,7 @@ def fetch_extract_for_title(session, title):
     return extract
 
 def tokenize(text):
+    WORD_RE = re.compile(r"\b[a-z']+\b", re.IGNORECASE)  # basic tokenizer: letters and apostrophes
     return [w.lower() for w in WORD_RE.findall(text)]
 
 def main():

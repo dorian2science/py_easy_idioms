@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import io
 import re
+import glob
 import asyncio
 import edge_tts
 import nest_asyncio
@@ -15,6 +16,9 @@ from googletrans import Translator
 from pydub import AudioSegment
 import dotenv
 from tqdm import tqdm
+import warnings
+warnings.filterwarnings('ignore')
+import argostranslate.package, argostranslate.translate
 dotenv.load_dotenv()
 
 translator = Translator()
@@ -39,6 +43,43 @@ EDGE_VOICES_SELECTED = {
         # 'fr':'Vivienne'
         }.items()
 }
+
+
+def is_arabic(word: str) -> bool:
+    arabic_re = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]')
+    """Return True if the word contains Arabic letters."""
+    return bool(arabic_re.search(word))
+
+def get_glossary():
+    files = glob.glob(os.path.join(DATA_FOLDER,"words_most_frequent_to_filter")+"/*.csv")
+    files = [f for f in files if re.match(r'.*\d+\.csv',f)]
+    df_all_concat = pd.concat([pd.read_csv(f) for f in files])
+    df_real = df_all_concat[df_all_concat['ar'].apply(is_arabic)]
+    return df_real
+
+def check_word_in_dict(word,lang='en'):
+    df_real = get_glossary()
+    return df_real[df_real[lang].str.contains(word)]
+
+def find_new_words_from_text(text):
+    df_real = get_glossary()
+
+def install_dict_packages():
+    argostranslate.package.update_package_index()
+    available_packages = argostranslate.package.get_available_packages()
+    idioms = {
+        "en":"ar",
+        "en":"fr",
+        "en":"es",
+        "en":"de",
+        "ar":"en",
+        "ar":"fr",
+        "ar":"de",
+        "ar":"es"
+    }
+    for l1,l2 in idioms.items():
+        package_to_install = next(p for p in available_packages if p.from_code == l1 and p.to_code == l2)
+        argostranslate.package.install_from_path(package_to_install.download())
 
 async def download_list_voices_edge():
     async def list_voices():
@@ -110,7 +151,17 @@ async def tts_text(text,lang,output_path="output.mp3",model="edge"):
 def list_words_stored_as_clips():
     return [m.groups()[0] for f in os.listdir(OUTPUT_IMAGE_FOLDER) if (m := re.search(r"word_([a-zA-Z]+)\.png",f))]
 
-def build_dataframe_words(list_words, translate=['ar','fr','de']):
+def quick_translate(text,l1='ar',l2='en'):
+    return argostranslate.translate.translate(text,l1,l2)
+
+def translate_words(list_words,lang_in='ar',lang_out='en'):
+    translations = []
+    for w in tqdm(list_words, unit="word"):
+        result = argostranslate.translate.translate(w, lang_in, lang_out)
+        translations.append(result)
+    return translations
+
+def build_dataframe_words(list_words, lang_in='en',translate=['ar','fr','de'],model='argos'):
     """
     Build a DataFrame with English words and their translations
     into specified languages.
@@ -123,14 +174,18 @@ def build_dataframe_words(list_words, translate=['ar','fr','de']):
         pd.DataFrame: DataFrame with columns [word_en, <lang1>, <lang2>, ...]
     """
     translator = Translator()
-    data = {"en": list_words}
 
+    data = {"en": list_words}
     for lang in translate:
         translations = []
         for w in tqdm(list_words, desc=f"{lang}", unit="word"):
             try:
-                result = translator.translate(w, src="en", dest=lang)
-                translations.append(result.text)
+                if model=='google':
+                    result = translator.translate(w, src="en", dest=lang)
+                    translations.append(result.text)
+                elif model=="argos":
+                    result = argostranslate.translate.translate(w, "en", lang)
+                    translations.append(result)
             except Exception as e:
                 translations.append(None)  # in case of failure
         data[lang] = translations
@@ -143,7 +198,7 @@ async def generate_picture_and_sound(word,gap=80):
     list_existing_words = list_words_stored_as_clips()
     # print(list_existing_words,word['en'])
     if word['en'] in list_existing_words:
-        print(f"word {word['en']} already available as clip.")
+        # print(f"word {word['en']} already available as clip.")
         return
 
     arabic_word = word['ar']
@@ -227,3 +282,73 @@ def build_video(words_list_en,final_video_path="words_video.mp4"):
     final_video_full_path = os.path.join(OUTPUT_VIDEO_FOLDER,final_video_path)
     final_video.write_videofile(final_video_full_path, fps=24)
     print("✅ Video created:", final_video_path)
+
+
+#######
+import pandas as pd
+from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.formatters import SRTFormatter
+import pyperclip
+
+def get_captions(video_id):
+    a = YouTubeTranscriptApi().list(video_id=video_id)
+    lang = 'ar'
+    b = a.find_generated_transcript([lang])
+    c = b.fetch()
+    res = convert_start(c)
+    c.paragraph = ' '.join([p[2] for p in res])
+    return c
+
+def convert_start(c):
+    l = []
+    for j,k in enumerate(c.snippets):
+        s = pd.to_timedelta(f"{k.start}s")
+        t = f"{s.components.hours:02d}:{s.components.minutes:02d}:{s.components.seconds:02d}"
+        l.append([j,t,k.text])
+    return l
+
+def divide_range_into_groups(x, z):
+    start, end = x
+    ranges = []
+    current = start
+
+    while current <= end:
+        group_end = min(current + z - 1, end)
+        ranges.append((current, group_end))
+        current = group_end + 1
+
+    return ranges
+
+import re
+
+def tokenize(text, lang='ar'):
+    if lang == 'en':
+        # English words: sequences of letters + optional apostrophes
+        WORD_RE = re.compile(r"\b[a-z']+\b", re.IGNORECASE)
+    elif lang == 'ar':
+        # Arabic words: Arabic Unicode ranges
+        WORD_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]+")
+    else:
+        raise ValueError(f"Unsupported language: {lang}")
+
+    return [w.lower() for w in WORD_RE.findall(text)]
+
+def quick_sort_after_filtering(df_or_filename,save_file=False):
+    if isinstance(df_or_filename,pd.DataFrame):
+        df = df_or_filename
+    elif isinstance(df_or_filename,str):
+        filename =df_or_filename
+        filepath = os.path.join(DATA_FOLDER,filename)
+        base_filename = filename[:-4]
+        df = pd.read_csv(filepath)
+    df = df[~df['iteration'].isna()]
+    df['iteration'] = df['iteration'].astype(float).astype(int)
+    df_unknown = df[df['iteration']>=0]
+    df_known = df[df['iteration']<0]
+    df_known = df_known[df_known['iteration']>-5]
+    if save_file:
+        known_words_file = os.path.join(DATA_FOLDER,f"{base_filename}_known.csv")
+        unknown_words_file = os.path.join(DATA_FOLDER,f"{base_filename}_unknown.csv")
+        df_unknown.to_csv(unknown_words_file,index=False)
+        df_known.to_csv(known_words_file,index=False)
+    return df_unknown,df_known
